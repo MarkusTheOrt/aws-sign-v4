@@ -50,7 +50,7 @@ where
     service: &'a str,
 
     /// 
-    digest: &'a str,
+    digest: String,
 }
 
 impl<'a> AwsSign<'a, HashMap<String, String>> {
@@ -76,6 +76,7 @@ impl<'a> AwsSign<'a, HashMap<String, String>> {
                 }
             })
             .collect();
+        let digest = digest.unwrap_or(&sha256::digest("")).to_owned();
         Self {
             method,
             url,
@@ -85,7 +86,7 @@ impl<'a> AwsSign<'a, HashMap<String, String>> {
             secret_key,
             headers,
             service,
-            digest: digest.unwrap_or(""),
+            digest,
         }
     }
 }
@@ -242,7 +243,7 @@ mod tests {
             "a",
             "b",
             "s3",
-            Some("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+            None
         );
         let s = aws_sign.canonical_request();
         assert_eq!(s, "GET\n/Prod/graphql\n\n\n\n\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
