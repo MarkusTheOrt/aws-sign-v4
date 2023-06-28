@@ -2,7 +2,6 @@ use chrono::{DateTime, Utc};
 use http::header::HeaderMap;
 use url::Url;
 use std::collections::HashMap;
-use sha256::{digest};
 
 const SHORT_DATE: &str = "%Y%m%d";
 const LONG_DATETIME: &str = "%Y%m%dT%H%M%SZ";
@@ -50,8 +49,8 @@ where
     */
     service: &'a str,
 
-    /// body, such as in an http POST
-    body: &'a str,
+    /// 
+    digest: &'a str,
 }
 
 impl<'a> AwsSign<'a, HashMap<String, String>> {
@@ -64,7 +63,7 @@ impl<'a> AwsSign<'a, HashMap<String, String>> {
         access_key: &'a str,
         secret_key: &'a str,
         service: &'a str,
-        body: &'a str,
+        digest: Option<&'a str>,
     ) -> Self {
         let url: Url = url.parse().unwrap();
         let headers: HashMap<String, String> = headers
@@ -86,7 +85,7 @@ impl<'a> AwsSign<'a, HashMap<String, String>> {
             secret_key,
             headers,
             service,
-            body,
+            digest: digest.unwrap_or(""),
         }
     }
 }
@@ -127,7 +126,7 @@ where
             query_string = canonical_query_string(&self.url),
             headers = self.canonical_header_string(),
             signed = self.signed_header_string(),
-            sha256 = digest(self.body),
+            sha256 = self.digest,
         )
     }
     pub fn sign(&'a self) -> String {
@@ -243,7 +242,7 @@ mod tests {
             "a",
             "b",
             "s3",
-            ""
+            Some("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
         );
         let s = aws_sign.canonical_request();
         assert_eq!(s, "GET\n/Prod/graphql\n\n\n\n\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
