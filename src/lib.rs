@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use http::header::HeaderMap;
-use url::Url;
 use std::collections::HashMap;
+use url::Url;
 
 const SHORT_DATE: &str = "%Y%m%d";
 const LONG_DATETIME: &str = "%Y%m%dT%H%M%SZ";
@@ -19,9 +19,9 @@ where
     secret_key: &'a str,
     headers: T,
 
-    /* 
+    /*
     service is the <aws-service-code> that can be found in the service-quotas api.
-    
+
     For example, use the value `ServiceCode` for this `service` property.
     Thus, for "Amazon Simple Storage Service (Amazon S3)", you would use value "s3"
 
@@ -49,10 +49,11 @@ where
     */
     service: &'a str,
 
-    /// 
+    /// The SHA256 Digest of the body
     digest: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl<'a> AwsSign<'a, HashMap<String, String>> {
     pub fn new(
         method: &'a str,
@@ -118,7 +119,7 @@ where
     }
 
     pub fn canonical_request(&'a self) -> String {
-        let url: &str = self.url.path().into();
+        let url: &str = self.url.path();
 
         format!(
             "{method}\n{uri}\n{query_string}\n{headers}\n\n{signed}\n{sha256}",
@@ -159,12 +160,7 @@ pub fn uri_encode(string: &str, encode_slash: bool) -> String {
             '/' if !encode_slash => result.push('/'),
             _ => {
                 result.push('%');
-                result.push_str(
-                    &format!("{}", c)
-                        .bytes()
-                        .map(|b| format!("{:02X}", b))
-                        .collect::<String>(),
-                );
+                result.push_str(&format!("{:02X}", c as u8));
             }
         }
     }
@@ -189,7 +185,12 @@ pub fn scope_string(datetime: &DateTime<Utc>, region: &str, service: &str) -> St
     )
 }
 
-pub fn string_to_sign(datetime: &DateTime<Utc>, region: &str, canonical_req: &str, service: &str) -> String {
+pub fn string_to_sign(
+    datetime: &DateTime<Utc>,
+    region: &str,
+    canonical_req: &str,
+    service: &str,
+) -> String {
     let hash = ring::digest::digest(&ring::digest::SHA256, canonical_req.as_bytes());
     format!(
         "AWS4-HMAC-SHA256\n{timestamp}\n{scope}\n{hash}",
@@ -224,7 +225,6 @@ pub fn signing_key(
     Ok(signing_tag.as_ref().to_vec())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,7 +243,7 @@ mod tests {
             "a",
             "b",
             "s3",
-            None
+            None,
         );
         let s = aws_sign.canonical_request();
         assert_eq!(s, "GET\n/Prod/graphql\n\n\n\n\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
