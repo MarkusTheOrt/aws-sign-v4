@@ -161,27 +161,44 @@ where
     //&X-Amz-Signature=af4dff36906316800dd2c34797110c30285f9442e691a87b5c6673682c7a1066
     //
     pub fn presign(&'a self, duration: std::time::Duration) -> String {
-        let canonical = self.canonical_request();
+        let canonical = self.canonical_presign(duration);
         let string_to_sign = string_to_sign(self.datetime, self.region, &canonical, self.service);
         let signing_key = signing_key(self.datetime, self.secret_key, self.region, self.service);
         let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &signing_key.unwrap());
         let tag = ring::hmac::sign(&key, string_to_sign.as_bytes());
         let signature = hex::encode(tag.as_ref());
         let signed_headers = self.signed_header_string();
-
         format!(
-            "{url}?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Checksum-Mode=ENABLED\
-            &X-Amz-Credential={access_key}/{scope},\
+            "{url}?X-Amz-Algorithm=AWS4-HMAC-SHA256\
+            &X-Amz-Credential={access_key}%2F{scope}\
             &X-Amz-Date={date}&X-Amz-Expires={expiry_seconds}\
-            &X-Amz-SignedHeaders={signed_headers}&x-id=GetObject\
+            &X-Amz-SignedHeaders={signed_headers}\
             &X-Amz-Signature={signature}",
             url = self.url,
             access_key = self.access_key,
-            scope = scope_string(self.datetime, self.region, self.service),
+            scope = uri_encode(
+                &scope_string(self.datetime, self.region, self.service),
+                true
+            ),
             signed_headers = signed_headers,
             signature = signature,
             expiry_seconds = duration.as_secs(),
             date = self.datetime.format(LONG_DATETIME)
+        )
+    }
+
+    pub fn canonical_presign(&'a self, duration: std::time::Duration) -> String {
+        let url: &str = self.url.path();
+        format!(
+            "{method}\n{uri}\nX-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential={access}%2F{scope}&X-Amz-Date={datetime}&X-Amz-Expires={seconds}&X-Amz-SignedHeaders=host\n{headers}\n\n{signed}\nUNSIGNED-PAYLOAD",
+            method = self.method,
+            uri = url,
+            scope = uri_encode(&scope_string(self.datetime, self.region, self.service), true),
+            datetime = self.datetime.format(LONG_DATETIME),
+            seconds = duration.as_secs(),
+            headers = &self.canonical_header_string(),
+            signed = self.signed_header_string(),
+            access = self.access_key,
         )
     }
 }
