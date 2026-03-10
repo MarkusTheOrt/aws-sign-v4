@@ -149,6 +149,41 @@ where
             signature = signature
         )
     }
+
+    // https://nbg1.your-objectstorage.com/wdash/0c14dbeb-0f9d-48c2-9f06-92931afb40f1.jpg
+    //?X-Amz-Algorithm=AWS4-HMAC-SHA256
+    //&X-Amz-Checksum-Mode=ENABLED
+    //&X-Amz-Credential=YZJD36XYKZITVICZ4T7I%2F20260310%2Fnbg1%2Fs3%2Faws4_request
+    //&X-Amz-Date=20260310T164221Z
+    //&X-Amz-Expires=600
+    //&X-Amz-SignedHeaders=host
+    //&x-id=GetObject
+    //&X-Amz-Signature=af4dff36906316800dd2c34797110c30285f9442e691a87b5c6673682c7a1066
+    //
+    pub fn presign(&'a self, duration: std::time::Duration) -> String {
+        let canonical = self.canonical_request();
+        let string_to_sign = string_to_sign(self.datetime, self.region, &canonical, self.service);
+        let signing_key = signing_key(self.datetime, self.secret_key, self.region, self.service);
+        let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &signing_key.unwrap());
+        let tag = ring::hmac::sign(&key, string_to_sign.as_bytes());
+        let signature = hex::encode(tag.as_ref());
+        let signed_headers = self.signed_header_string();
+
+        format!(
+            "{url}?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Checksum-Mode=ENABLED\
+            &X-Amz-Credential={access_key}/{scope},\
+            &X-Amz-Date={date}&X-Amz-Expires={expiry_seconds}\
+            &X-Amz-SignedHeaders={signed_headers}&x-id=GetObject\
+            &X-Amz-Signature={signature}",
+            url = self.url,
+            access_key = self.access_key,
+            scope = scope_string(self.datetime, self.region, self.service),
+            signed_headers = signed_headers,
+            signature = signature,
+            expiry_seconds = duration.as_secs(),
+            date = self.datetime.format(LONG_DATETIME)
+        )
+    }
 }
 
 pub fn uri_encode(string: &str, encode_slash: bool) -> String {
